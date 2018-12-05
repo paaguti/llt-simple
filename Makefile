@@ -7,7 +7,7 @@ SRCS := $(wildcard *.cc *.h)
 
 run: clean-results $(SRCS) | $(OUTDIR)
 	./run-test.bash $(TOP) $(OUTDIR)
-	tree $(OUTDIR)
+	# tree $(OUTDIR)
 
 $(OUTDIR): ; mkdir -p $@
 

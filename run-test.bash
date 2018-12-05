@@ -44,6 +44,7 @@ function main() {
 	  done
   done
   zip -9rD ${zipname} $2
+  ./mkCBRtable ${zipname}
 }
 
 main $*
