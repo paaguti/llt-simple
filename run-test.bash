@@ -18,15 +18,15 @@ function save_results() {
   local d="$2"
   echo "saving test results to ${d}"
   mkdir -p ${d}
-  cp $1/*.{txt,pcap,sca} ${d}
+  mv $1/*.{txt,pcap,sca} ${d}
 }
 
 function main() {
   local base_from=$1 base_to=$2
 
-  zipname=`printf "%s-%s.zip" $(basename $(pwd)) $(date "+%Y%M%d-%H%m")`
+  zipname=`printf "%s-%s.zip" $(basename $(pwd)) $(date "+%Y%m%d-%H%M")`
   rm -vf ${zipname}
-  
+  printf "Creating: %s\n" ${zipname}
   for video in "false" "true"
   do
 	  [ "$video" == "true" ] && vtag="video"
