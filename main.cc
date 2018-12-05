@@ -1,3 +1,4 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 // See README.md
 
 #include "ns3/applications-module.h"
@@ -13,6 +14,8 @@
 #include "ns3/nstime.h"
 #include "ns3/point-to-point-helper.h"
 #include "realtime-apps.h"
+
+#include <cassert>
 
 using namespace ns3;
 
@@ -31,8 +34,13 @@ main (int argc, char *argv[])
   bool markingEnabled = true;
   bool videoExperiment = false;
 
+  // Create a DataCollector object to hold information about this run.
+  DataCollector data;
+
   int guard = 2;				// Guard time to start CBR in seconds
   int duration = 10;			// CBR flow duration in seconds
+
+  int nodes = 1;
 
   std::string runId = "run-" + std::to_string (time (NULL));
   std::string experiment ("loss latency tradeoff");
@@ -75,7 +83,7 @@ main (int argc, char *argv[])
 
   // Create Node object for the UEs
   NodeContainer UE;
-  UE.Create (1);				// One UE only
+  UE.Create (nodes);				// One UE only
 
   // Configure the Mobility model for all the nodes.  The above will place all
   // nodes at the coordinates (0,0,0).  Refer to the documentation of the ns-3
@@ -99,13 +107,23 @@ main (int argc, char *argv[])
   InternetStackHelper IPStack;
   IPStack.Install (UE);
 
-  Ptr<Node>UENode = UE.Get(0);
+  for (int node = 0; node < nodes; node++) {
+    Ptr<Node>UENode = UE.Get(node);
+    Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
 
-  auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer (UEDevice.Get (0)));
-  // Set the default gateway for the UE
-  Ipv4StaticRoutingHelper ipv4RoutingHelper;
-  auto ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (UENode->GetObject<Ipv4> ());
-  ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
+    assert(UENetDev == UEDevice.Get (node));
+
+    auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer(UENetDev));
+
+    Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
+    Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
+    std::cout << "UE Node " << node << " got address " << UENodeAddr << std::endl;
+
+    // Set the default gateway for the UE
+    Ipv4StaticRoutingHelper ipv4RoutingHelper;
+    auto ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (UENode->GetObject<Ipv4> ());
+    ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
+  }
 
   // Attach the UE to an eNB. This will configure the UE according to the eNB
   // settings, and create an RRC connection between them.
@@ -146,99 +164,108 @@ main (int argc, char *argv[])
   // interface 0 is localhost, 1 is the point-to-point device
   // Ipv4Address appServerAddr = SGiLANIpIfaces.GetAddress(1);
 
+  Ipv4StaticRoutingHelper ipv4RoutingHelper;
   auto appServerStaticRouting =
       ipv4RoutingHelper.GetStaticRouting (appServer.Get (0)->GetObject<Ipv4> ());
   appServerStaticRouting->AddNetworkRouteTo (epcHelper->GetUeDefaultGatewayAddress (),
                                              Ipv4Mask ("255.255.0.0"), 1);
 
-  //
-  // Realtime sender (server in the SGi)
-  //
-  // Application simulating realtime downlink communication using a Realtime
-  // sender/receiver pair.  If instructed to do so, sender can mark all
-  // outgoing packets with the LLT PHB codepoint for low-latency which is
-  // mapped to a dedicated EPS bearer with low-latency QCI on LTE segment.
-  auto appSource = appServer.Get (0);
-  auto sender = CreateObject<RealtimeSender> ();
-  appSource->AddApplication (sender);
-  sender->SetStartTime (Seconds (guard));
+  for (int node=0; node < nodes; node++){
+    Ptr<Node>UENode = UE.Get(node);
+    Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
+    assert(UENetDev == UEDevice.Get (node));
 
-  sender->SetAttribute ("Destination",
-						Ipv4AddressValue (UEIpIface.GetAddress (0)));
-  sender->SetAttribute ("Port",
-						UintegerValue (dlRtPort));
+    Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
+    Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
+    std::cout << "UE Node " << node << " has address " << UENodeAddr << std::endl;
+    //
+    // Realtime sender (server in the SGi)
+    //
+    // Application simulating realtime downlink communication using a Realtime
+    // sender/receiver pair.  If instructed to do so, sender can mark all
+    // outgoing packets with the LLT PHB codepoint for low-latency which is
+    // mapped to a dedicated EPS bearer with low-latency QCI on LTE segment.
+    auto appSource = appServer.Get (0);
+    auto sender = CreateObject<RealtimeSender> ();
+    appSource->AddApplication (sender);
+    sender->SetStartTime (Seconds (guard));
 
-  // simulate downstream real-time audio, specifically:
-  // 64kbps PCM audio packetized in 20ms increments
-  // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
-  // 200 / 0.02 bytes/second = 80kbps
+    sender->SetAttribute ("Destination",
+                          Ipv4AddressValue (UENodeAddr));
+    sender->SetAttribute ("Port",
+                          UintegerValue (dlRtPort));
 
-  // default audio:
-  int packet = 160;				// packet size: 160 PCM
-  int pps = 50;					// packet rate: 20ms (50 pps)
+    // simulate downstream real-time audio, specifically:
+    // 64kbps PCM audio packetized in 20ms increments
+    // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
+    // 200 / 0.02 bytes/second = 80kbps
 
-  if (videoExperiment) {
-	  // Video: RTP, 900 bytes-100pps
-	  // Required bandwidth: 940 bytes/pkt * 8bits/byte * 100 pkt/s = 752 kbps
-	  packet = 900;
-	  pps = 100;
-  }
+    // default audio:
+    int packet = 160;				// packet size: 160 PCM
+    int pps = 50;					// packet rate: 20ms (50 pps)
 
-  sender->SetAttribute ("PacketSize",
-						UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
-  sender->SetAttribute ("Interval",
-						TimeValue (MilliSeconds (1000/pps)));
-  // Send for 10s at most
-  sender->SetAttribute ("NumPackets",
-						UintegerValue (duration * pps));
+    if (videoExperiment) {
+      // Video: RTP, 900 bytes-100pps
+      // Required bandwidth: 940 bytes/pkt * 8bits/byte * 100 pkt/s = 752 kbps
+      packet = 900;
+      pps = 100;
+    }
 
+    sender->SetAttribute ("PacketSize",
+                          UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
+    sender->SetAttribute ("Interval",
+                          TimeValue (MilliSeconds (1000/pps)));
+    // Send for 10s at most
+    sender->SetAttribute ("NumPackets",
+                          UintegerValue (duration * pps));
 
-  if (markingEnabled) {
+    if (markingEnabled) {
       sender->SetAttribute ("ToS",
-							UintegerValue (LLT_LOW_LATENCY));
+                            UintegerValue (LLT_LOW_LATENCY));
+    }
+
+    //
+    // Realtime receiver (UE)
+    //
+    auto receiver = CreateObject<RealtimeReceiver> ();
+    UENode->AddApplication (receiver);
+    receiver->SetStartTime (Seconds (0));
+    receiver->SetAttribute("Port", UintegerValue (dlRtPort));
+
+    if (node == 0) {
+      //
+      // Stats collection on the realtime app
+      //
+      data.DescribeRun (experiment, strategy, input, runId);
+      // Add any information we wish to record about this run.
+      data.AddMetadata ("LLT", uint32_t (markingEnabled));
+      // use millisec granularity (See RealtimeReceiver classe)
+      auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
+      rtAppDelayStat->SetKey ("real time app delay (ms)");
+      receiver->SetDelayTracker (rtAppDelayStat);
+      data.AddDataCalculator (rtAppDelayStat);
+
+      // Jitter (paag)
+      auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
+      rtAppJitterStat->SetKey ("real time app jitter (ms)");
+      receiver->SetJitterTracker (rtAppJitterStat);
+      data.AddDataCalculator (rtAppJitterStat);
+    }
+
+    // Downlink pipe filler, no marking whatsoever
+    BulkSendHelper greedySender ("ns3::TcpSocketFactory",
+                                 InetSocketAddress (UENodeAddr, dlGreedyPort));
+    // MaxBytes==0 means send as much as possible until stopped
+    greedySender.SetAttribute ("MaxBytes", UintegerValue (0));
+    greedySender.SetAttribute ("SendSize", UintegerValue (1400));
+    auto greedySenderApp = greedySender.Install (appServer.Get (0));
+    greedySenderApp.Start (Seconds (0.02));
+
+    PacketSinkHelper greedyReceiver ("ns3::TcpSocketFactory",
+                                     InetSocketAddress (Ipv4Address::GetAny (), dlGreedyPort));
+    auto greedyReceiverApp = greedyReceiver.Install (UENode);
+    greedyReceiverApp.Start (Seconds (0.01));
   }
-
-  //
-  // Realtime receiver (UE)
-  //
-  auto receiver = CreateObject<RealtimeReceiver> ();
-  UENode->AddApplication (receiver);
-  receiver->SetStartTime (Seconds (0));
-  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeReceiver/Port", UintegerValue (dlRtPort));
-
-  //
-  // Stats collection on the realtime app
-  //
-  // Create a DataCollector object to hold information about this run.
-  DataCollector data;
-  data.DescribeRun (experiment, strategy, input, runId);
-  // Add any information we wish to record about this run.
-  data.AddMetadata ("LLT", uint32_t (markingEnabled));
-  // use millisec granularity (See RealtimeReceiver classe)
-  auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-  rtAppDelayStat->SetKey ("real time app delay (ms)");
-  receiver->SetDelayTracker (rtAppDelayStat);
-  data.AddDataCalculator (rtAppDelayStat);
-
-  // Jitter (paag)
-  auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-  rtAppJitterStat->SetKey ("real time app jitter (ms)");
-  receiver->SetJitterTracker (rtAppJitterStat);
-  data.AddDataCalculator (rtAppJitterStat);
-
-  // Downlink pipe filler, no marking whatsoever
-  BulkSendHelper greedySender ("ns3::TcpSocketFactory",
-                               InetSocketAddress (UEIpIface.GetAddress (0), dlGreedyPort));
-  // MaxBytes==0 means send as much as possible until stopped
-  greedySender.SetAttribute ("MaxBytes", UintegerValue (0));
-  greedySender.SetAttribute ("SendSize", UintegerValue (1400));
-  auto greedySenderApp = greedySender.Install (appServer.Get (0));
-  greedySenderApp.Start (Seconds (0.02));
-
-  PacketSinkHelper greedyReceiver ("ns3::TcpSocketFactory",
-                                   InetSocketAddress (Ipv4Address::GetAny (), dlGreedyPort));
-  auto greedyReceiverApp = greedyReceiver.Install (UENode);
-  greedyReceiverApp.Start (Seconds (0.01));
 
   // Dump PHY, MAC, RLC and PDCP level KPIs
   lteHelper->EnableTraces ();
