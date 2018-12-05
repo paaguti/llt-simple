@@ -22,7 +22,7 @@ def main():
     for h in head:
         print (fmt.format(h),end='')
         if h == 'mark': fmt = '{:8s} & '
-        if h == 'max': fmt = '{:8s} \\\\'
+        if h == 'max': fmt = '{:8s} \\\\ \\midrule'
     print()
 
     nodes=2
@@ -34,38 +34,32 @@ def main():
     if args.verbose:
         print('Contents of {}:\n '.format(args.ZIP),end='',file=sys.stderr)
     with ZipFile(args.ZIP) as simul:
+        sca_files = sorted([l for l in simul.namelist() if l.endswith('.sca')])
         if args.verbose:
-            print("\n ".join([l for l in simul.namelist() if l.endswith('.sca')]),file=sys.stderr)
+            print("\n ".join(sca_files),file=sys.stderr)
+        for elem in sca_files:
+            result = dict()
+            statType = None
+            with simul.open(elem,'r') as myfile:
+                for l in myfile.readlines():
+                    line = l.decode().strip()
+                    mStat = statRe.match(line)
+                    mVal  = valRe.match(line)
+                    if mStat is None and mVal is None:
+                        continue
+                    if mVal is not None:
+                        statType = mVal.group(1)
+                        result[statType] = dict()
 
-        for s in stream:
-            for m in mark:
-                elem = 'results/{}/{}/nodes-{:02d}/data-llt-simple-marking-{}-{}-{:02d}.sca'.format(s,m,nodes,
-                                                                                                    s,m,nodes)
+                    if mStat is not None:
+                        rDict = result[statType]
+                        rDict[mStat.group(1)] = mStat.group(3)
+
                 if args.verbose:
-                    print ('>>Trying {}'.format(elem),file=sys.stderr)
-                if elem not in simul.namelist():
-                    continue
-                if args.verbose:
-                    print ('>>Analysing {}'.format(elem),file=sys.stderr)
-                result = dict()
-                statType = None
-                with simul.open(elem,'r') as myfile:
-                    for l in myfile.readlines():
-                        line = l.decode().strip()
-                        mStat = statRe.match(line)
-                        mVal  = valRe.match(line)
-                        if mStat is None and mVal is None:
-                            continue
-                        if mVal is not None:
-                            statType = mVal.group(1)
-                            result[statType] = dict()
+                    print ('Parsed {} and obtained '.format(elem),file=sys.stderr)
+                    print (result,file=sys.stderr)
+                _,s,m,_ = elem.split('/')
 
-                        if mStat is not None:
-                            rDict = result[statType]
-                            rDict[mStat.group(1)] = mStat.group(3)
-
-                # print ('Parsed {} and obtained '.format(elem),file=sys.stderr)
-                # print (result,file=sys.stderr)
                 print ('{:6s} & {:6s} & '.format(s,m), end='')
                 for f in fields:
                     print ('{:8s} & '.format(result['delay'][f]),end='')
