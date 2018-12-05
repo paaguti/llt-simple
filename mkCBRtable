@@ -16,45 +16,60 @@ def main():
     fields = [ 'mean', 'min', 'max' ]
     stream = [ 'audio',  'video' ]
     mark =   [ 'nomark', 'mark' ]
-    smark =  [ 'false',  'true' ]
+    head =   [ 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
 
-    parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog="")
-    parser.add_argument("ZIP", metavar="ZIP", type=str, help="ZIP file with simulation results")
+    fmt = '{:6s} & '
+    for h in head:
+        print (fmt.format(h),end='')
+        if h == 'mark': fmt = '{:8s} & '
+        if h == 'max': fmt = '{:8s} \\\\'
+    print()
+
+    nodes=2
+    parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog='')
+    parser.add_argument('ZIP', metavar='ZIP', type=str, help='ZIP file with simulation results')
+    parser.add_argument('-V','--verbose',  dest='verbose',action='store_true', help='Print extra info to stderr')
 
     args = parser.parse_args()
-    # print('Contents of {}:\n '.format(args.ZIP),end='',file=sys.stderr)
+    if args.verbose:
+        print('Contents of {}:\n '.format(args.ZIP),end='',file=sys.stderr)
     with ZipFile(args.ZIP) as simul:
-        # print("\n ".join([l for l in simul.namelist() if l.endswith('.sca')]),file=sys.stderr)
+        if args.verbose:
+            print("\n ".join([l for l in simul.namelist() if l.endswith('.sca')]),file=sys.stderr)
+
         for s in stream:
             for m in mark:
-                for n in smark:
-                    elem = 'results/{}/{}/data-llt-simple-marking-{}.sca'.format(s,m,n)
-                    if elem not in simul.namelist():
-                        continue
-                    # print (">>Analysing {}".format(elem),file=sys.stderr)
-                    result = dict()
-                    statType = None
-                    with simul.open(elem,'r') as myfile:
-                        for l in myfile.readlines():
-                            line = l.decode().strip()
-                            mStat = statRe.match(line)
-                            mVal  = valRe.match(line)
-                            if mStat is None and mVal is None:
-                                continue
-                            if mVal is not None:
-                                statType = mVal.group(1)
-                                result[statType] = dict()
+                elem = 'results/{}/{}/nodes-{:02d}/data-llt-simple-marking-{}-{}-{:02d}.sca'.format(s,m,nodes,
+                                                                                                    s,m,nodes)
+                if args.verbose:
+                    print ('>>Trying {}'.format(elem),file=sys.stderr)
+                if elem not in simul.namelist():
+                    continue
+                if args.verbose:
+                    print ('>>Analysing {}'.format(elem),file=sys.stderr)
+                result = dict()
+                statType = None
+                with simul.open(elem,'r') as myfile:
+                    for l in myfile.readlines():
+                        line = l.decode().strip()
+                        mStat = statRe.match(line)
+                        mVal  = valRe.match(line)
+                        if mStat is None and mVal is None:
+                            continue
+                        if mVal is not None:
+                            statType = mVal.group(1)
+                            result[statType] = dict()
 
-                            if mStat is not None:
-                                rDict = result[statType]
-                                rDict[mStat.group(1)] = mStat.group(3)
+                        if mStat is not None:
+                            rDict = result[statType]
+                            rDict[mStat.group(1)] = mStat.group(3)
 
-                    # print ("Parsed {} and obtained ".format(elem),file=sys.stderr)
-                    # print (result,file=sys.stderr)
-                    print ("{:6} & {:6} & {:6} &".format(s,n,m), end=' ')
-                    for f in fields:
-                        print ("{} & ".format(result['delay'][f]),end='')
-                    print ("{} \\\\".format(result['jitter']['mean']))
+                # print ('Parsed {} and obtained '.format(elem),file=sys.stderr)
+                # print (result,file=sys.stderr)
+                print ('{:6s} & {:6s} & '.format(s,m), end='')
+                for f in fields:
+                    print ('{:8s} & '.format(result['delay'][f]),end='')
+                print ('{:8s} \\\\'.format(result['jitter']['mean']))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
