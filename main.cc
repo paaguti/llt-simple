@@ -25,8 +25,14 @@ NS_LOG_COMPONENT_DEFINE ("LLTSimple");
 int
 main (int argc, char *argv[])
 {
+  uint16_t dlRtPort = 1234;
+  uint16_t dlGreedyPort = 5687;
+
   bool markingEnabled = true;
   bool videoExperiment = false;
+
+  int guard = 2;				// Guard time to start CBR in seconds
+  int duration = 10;			// CBR flow duration in seconds
 
   std::string runId = "run-" + std::to_string (time (NULL));
   std::string experiment ("loss latency tradeoff");
@@ -69,7 +75,7 @@ main (int argc, char *argv[])
 
   // Create Node object for the UEs
   NodeContainer UE;
-  UE.Create (2);
+  UE.Create (1);				// One UE only
 
   // Configure the Mobility model for all the nodes.  The above will place all
   // nodes at the coordinates (0,0,0).  Refer to the documentation of the ns-3
@@ -93,10 +99,12 @@ main (int argc, char *argv[])
   InternetStackHelper IPStack;
   IPStack.Install (UE);
 
+  Ptr<Node>UENode = UE.Get(0);
+
   auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer (UEDevice.Get (0)));
   // Set the default gateway for the UE
   Ipv4StaticRoutingHelper ipv4RoutingHelper;
-  auto ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (UE.Get (0)->GetObject<Ipv4> ());
+  auto ueStaticRouting = ipv4RoutingHelper.GetStaticRouting (UENode->GetObject<Ipv4> ());
   ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
 
   // Attach the UE to an eNB. This will configure the UE according to the eNB
@@ -153,54 +161,48 @@ main (int argc, char *argv[])
   auto appSource = appServer.Get (0);
   auto sender = CreateObject<RealtimeSender> ();
   appSource->AddApplication (sender);
-  sender->SetStartTime (Seconds (2));
+  sender->SetStartTime (Seconds (guard));
+
+  sender->SetAttribute ("Destination",
+						Ipv4AddressValue (UEIpIface.GetAddress (0)));
+  sender->SetAttribute ("Port",
+						UintegerValue (dlRtPort));
 
   // simulate downstream real-time audio, specifically:
   // 64kbps PCM audio packetized in 20ms increments
   // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
   // 200 / 0.02 bytes/second = 80kbps
-  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/Destination",
-               Ipv4AddressValue (UEIpIface.GetAddress (0)));
-  uint16_t dlRtPort = 1234;
-  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/Port",
-			   UintegerValue (dlRtPort));
 
+  // default audio:
+  int packet = 160;				// packet size: 160 PCM
+  int pps = 50;					// packet rate: 20ms (50 pps)
 
-  if (videoExperiment)
-  {
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/PacketSize",
-				   UintegerValue (930));
-	  // - packet rate: 10ms (100 pps)
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/Interval",
-				   TimeValue (MilliSeconds (10)));
-	  // Send for 10s at most
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/NumPackets",
-				   UintegerValue (10 * 100));
-  } else {
-	  // audio
-	  // - packet size: 160 PCM + 12 RTP
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/PacketSize",
-				   UintegerValue (172));
-	  // - packet rate: 20ms (50 pps)
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/Interval",
-				   TimeValue (MilliSeconds (20)));
-	  // Send for 10s at most
-	  Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/NumPackets",
-				   UintegerValue (10 * 50));
+  if (videoExperiment) {
+	  // Video: RTP, 900 bytes-100pps
+	  // Required bandwidth: 940 bytes/pkt * 8bits/byte * 100 pkt/s = 752 kbps
+	  packet = 900;
+	  pps = 100;
   }
 
-  if (markingEnabled)
-  {
-      Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeSender/ToS",
-                   UintegerValue (LLT_LOW_LATENCY));
+  sender->SetAttribute ("PacketSize",
+						UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
+  sender->SetAttribute ("Interval",
+						TimeValue (MilliSeconds (1000/pps)));
+  // Send for 10s at most
+  sender->SetAttribute ("NumPackets",
+						UintegerValue (duration * pps));
+
+
+  if (markingEnabled) {
+      sender->SetAttribute ("ToS",
+							UintegerValue (LLT_LOW_LATENCY));
   }
 
   //
   // Realtime receiver (UE)
   //
-  auto appSink = UE.Get (0);
   auto receiver = CreateObject<RealtimeReceiver> ();
-  appSink->AddApplication (receiver);
+  UENode->AddApplication (receiver);
   receiver->SetStartTime (Seconds (0));
   Config::Set ("/NodeList/*/ApplicationList/*/$RealtimeReceiver/Port", UintegerValue (dlRtPort));
 
@@ -225,7 +227,6 @@ main (int argc, char *argv[])
   data.AddDataCalculator (rtAppJitterStat);
 
   // Downlink pipe filler, no marking whatsoever
-  uint16_t dlGreedyPort = 5687;
   BulkSendHelper greedySender ("ns3::TcpSocketFactory",
                                InetSocketAddress (UEIpIface.GetAddress (0), dlGreedyPort));
   // MaxBytes==0 means send as much as possible until stopped
@@ -236,7 +237,7 @@ main (int argc, char *argv[])
 
   PacketSinkHelper greedyReceiver ("ns3::TcpSocketFactory",
                                    InetSocketAddress (Ipv4Address::GetAny (), dlGreedyPort));
-  auto greedyReceiverApp = greedyReceiver.Install (UE.Get (0));
+  auto greedyReceiverApp = greedyReceiver.Install (UENode);
   greedyReceiverApp.Start (Seconds (0.01));
 
   // Dump PHY, MAC, RLC and PDCP level KPIs
@@ -248,7 +249,7 @@ main (int argc, char *argv[])
   // This is needed otherwise the simulation will last forever, because (among
   // others) the start-of-subframe event is scheduled repeatedly, and the ns-3
   // simulator scheduler will hence never run out of events.
-  Simulator::Stop (Seconds (5));
+  Simulator::Stop (Seconds (duration + 2*guard));
 
   // Run the simulation
   Simulator::Run ();
