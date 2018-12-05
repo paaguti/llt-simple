@@ -16,8 +16,11 @@ def main():
     fields = [ 'mean', 'min', 'max' ]
     stream = [ 'audio',  'video' ]
     mark =   [ 'nomark', 'mark' ]
-    head =   [ 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
 
+    #
+    # Print LATeX tabular head
+    #
+    head =   [ 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
     fmt = '{:6s} & '
     for h in head:
         print (fmt.format(h),end='')
@@ -25,7 +28,7 @@ def main():
         if h == 'max': fmt = '{:8s} \\\\ \\midrule'
     print()
 
-    nodes=2
+    # nodes=2
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog='')
     parser.add_argument('ZIP', metavar='ZIP', type=str, help='ZIP file with simulation results')
     parser.add_argument('-V','--verbose',  dest='verbose',action='store_true', help='Print extra info to stderr')
@@ -58,9 +61,13 @@ def main():
                 if args.verbose:
                     print ('Parsed {} and obtained '.format(elem),file=sys.stderr)
                     print (result,file=sys.stderr)
-                _,s,m,_ = elem.split('/')
+                base = os.path.basename(elem)
+                base,_=os.path.splitext(base)
+                # if args.verbose:
+                #     print(">> {}\n{}\n".format(base,repr(base.split('-'))))
+                m = base.split('-')
 
-                print ('{:6s} & {:6s} & '.format(s,m), end='')
+                print ('{:6s} & {:6s} & '.format(m[4],m[5]), end='')
                 for f in fields:
                     print ('{:8s} & '.format(result['delay'][f]),end='')
                 print ('{:8s} \\\\'.format(result['jitter']['mean']))
