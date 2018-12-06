@@ -20,7 +20,7 @@ def main():
     #
     # Print LATeX tabular head
     #
-    head =   [ 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
+    head =   [ 'nodes', 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
     fmt = '{:6s} & '
     for h in head:
         print (fmt.format(h),end='')
@@ -66,8 +66,12 @@ def main():
                 # if args.verbose:
                 #     print(">> {}\n{}\n".format(base,repr(base.split('-'))))
                 m = base.split('-')
+                try:
+                    nodes = m[6]
+                except:
+                    nodes = '1'
 
-                print ('{:6s} & {:6s} & '.format(m[4],m[5]), end='')
+                print ('{:6s} & {:6s} & {:6s} & '.format(nodes, m[4], m[5]), end='')
                 for f in fields:
                     print ('{:8s} & '.format(result['delay'][f]),end='')
                 print ('{:8s} \\\\'.format(result['jitter']['mean']))

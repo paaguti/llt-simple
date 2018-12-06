@@ -13,9 +13,18 @@
 #include "ns3/network-module.h"
 #include "ns3/nstime.h"
 #include "ns3/point-to-point-helper.h"
+#include "ns3/random-variable-stream.h"
+#include "ns3/ptr.h"
+#include "ns3/double.h"
+#include "ns3/string.h"
+#include "ns3/integer.h"
+#include "ns3/command-line.h"
+#include <map>
+#include <cmath>
+#include <cassert>
+
 #include "realtime-apps.h"
 
-#include <cassert>
 
 using namespace ns3;
 
@@ -24,6 +33,19 @@ enum {
 };
 
 NS_LOG_COMPONENT_DEFINE ("LLTSimple");
+
+static double
+dround (double number, double precision)
+{
+  number /= precision;
+  if (number >= 0) {
+      number = floor (number + 0.5);
+  } else {
+    number = ceil (number - 0.5);
+  }
+  number *= precision;
+  return number;
+}
 
 int
 main (int argc, char *argv[])
@@ -35,12 +57,13 @@ main (int argc, char *argv[])
   bool videoExperiment = false;
 
   // Create a DataCollector object to hold information about this run.
+  // Collect data for UE node 0 only
   DataCollector data;
 
-  int guard = 2;				// Guard time to start CBR in seconds
+  double guard = 2.0;				// Guard time to start CBR in seconds
   int duration = 10;			// CBR flow duration in seconds
 
-  int nodes = 1;
+  int nodes = 1;                // Number of UE devices
 
   std::string runId = "run-" + std::to_string (time (NULL));
   std::string experiment ("loss latency tradeoff");
@@ -57,6 +80,8 @@ main (int argc, char *argv[])
                 markingEnabled);
   cmd.AddValue ("video", "Whether we do an audio(def) or a video experiment.",
                 videoExperiment);
+  cmd.AddValue ("nodes", "Number of UEs (def: 1)",
+                nodes);
   cmd.Parse (argc, argv);
 
   // Configure FDD SISO (transmission mode 0) with 6 RBs, i.e. a peak downlink
@@ -65,6 +90,15 @@ main (int argc, char *argv[])
   Config::SetDefault ("ns3::LteEnbRrc::DefaultTransmissionMode", UintegerValue (0));
   Config::SetDefault ("ns3::LteEnbNetDevice::DlBandwidth", UintegerValue (6));
   Config::SetDefault ("ns3::LteEnbNetDevice::UlBandwidth", UintegerValue (6));
+
+  // To get to 20 UEs or past
+  Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue(80));
+
+  // A random variable to make the UEs start randomly around 2 seconds
+
+  Ptr<UniformRandomVariable> x1 = CreateObject<UniformRandomVariable> ();
+  x1->SetAttribute ("Min", DoubleValue (guard * 0.5));
+  x1->SetAttribute ("Max", DoubleValue (guard * 1.5));
 
   // This will instantiate some common objects (e.g., the Channel object) and
   // provide the methods to add eNBs and UEs and configure them.
@@ -107,6 +141,8 @@ main (int argc, char *argv[])
   InternetStackHelper IPStack;
   IPStack.Install (UE);
 
+  std::cout << "Creating " << nodes << " nodes" << std::endl;
+
   for (int node = 0; node < nodes; node++) {
     Ptr<Node>UENode = UE.Get(node);
     Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
@@ -115,9 +151,9 @@ main (int argc, char *argv[])
 
     auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer(UENetDev));
 
-    Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
-    Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
-    std::cout << "UE Node " << node << " got address " << UENodeAddr << std::endl;
+    // Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
+    // Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
+    // std::cout << "UE Node " << node << " got address " << UENodeAddr; // << std::endl;
 
     // Set the default gateway for the UE
     Ipv4StaticRoutingHelper ipv4RoutingHelper;
@@ -170,14 +206,17 @@ main (int argc, char *argv[])
   appServerStaticRouting->AddNetworkRouteTo (epcHelper->GetUeDefaultGatewayAddress (),
                                              Ipv4Mask ("255.255.0.0"), 1);
 
-  for (int node=0; node < nodes; node++){
+
+  for (int node=0; node < nodes; node++) {
+    // std::cout << "Creating apps in UE Node " << node << std::endl;
+
     Ptr<Node>UENode = UE.Get(node);
     Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
     assert(UENetDev == UEDevice.Get (node));
 
     Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
     Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
-    std::cout << "UE Node " << node << " has address " << UENodeAddr << std::endl;
+    std::cout << "Creating apps in UE Node " << node << ", address " << UENodeAddr; // << std::endl;
     //
     // Realtime sender (server in the SGi)
     //
@@ -188,7 +227,13 @@ main (int argc, char *argv[])
     auto appSource = appServer.Get (0);
     auto sender = CreateObject<RealtimeSender> ();
     appSource->AddApplication (sender);
-    sender->SetStartTime (Seconds (guard));
+    //
+    // Start randomly around 2.0 seconds, rounding at the milisecond precision
+    //
+    double startTime = dround(x1->GetValue(), 0.001);
+    sender->SetStartTime (Seconds (startTime));
+
+    std::cout << ", will start at " << startTime << "secs" << std::endl;
 
     sender->SetAttribute ("Destination",
                           Ipv4AddressValue (UENodeAddr));
@@ -215,7 +260,7 @@ main (int argc, char *argv[])
                           UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
     sender->SetAttribute ("Interval",
                           TimeValue (MilliSeconds (1000/pps)));
-    // Send for 10s at most
+
     sender->SetAttribute ("NumPackets",
                           UintegerValue (duration * pps));
 
@@ -276,7 +321,7 @@ main (int argc, char *argv[])
   // This is needed otherwise the simulation will last forever, because (among
   // others) the start-of-subframe event is scheduled repeatedly, and the ns-3
   // simulator scheduler will hence never run out of events.
-  Simulator::Stop (Seconds (duration + 2*guard));
+  Simulator::Stop (Seconds (duration + 2.0 * guard));
 
   // Run the simulation
   Simulator::Run ();

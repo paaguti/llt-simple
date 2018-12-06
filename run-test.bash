@@ -10,7 +10,7 @@ set -o pipefail
 # - EpcTftClassifier
 # - EpcTft
 
-declare -r S1_BW=5Mbps
+declare -r S1_BW=50Mbps
 
 # $1: source
 # $2: destination
@@ -18,32 +18,39 @@ function save_results() {
   local d="$2"
   echo "saving test results to ${d}"
   mkdir -p ${d}
-  mv $1/*.{txt,pcap,sca} ${d}
+  # mv $1/*.{txt,pcap,sca} ${d}
+  mv $1/*.{txt,sca} ${d}
 }
 
 function main() {
   local base_from=$1 base_to=$2
 
-  zipname=`printf "%s-%s.zip" $(basename $(pwd)) $(date "+%Y%m%d-%H%M")`
-  rm -vf ${zipname}
-  printf "Creating: %s\n" ${zipname}
-  for video in "false" "true"
+  start=$(date "+%Y%m%d-%H%M")
+  nodes=1
+  maxnodes=20
+  while [ ${nodes} -le ${maxnodes} ]
   do
-	  [ "$video" == "true" ] && vtag="video"
-	  [ "$video" == "true" ] || vtag="audio"
+    for video in "false" "true"
+    do
+      [ "$video" == "true" ] && vtag="video"
+      [ "$video" == "true" ] || vtag="audio"
 
-	  for marking in "false" "true"
-	  do
-		  [ "$marking" == "true" ] && mtag="mark"
-		  [ "$marking" == "true" ] || mtag="nomark"
+      for marking in "false" "true"
+      do
+        [ "$marking" == "true" ] && mtag="mark"
+        [ "$marking" == "true" ] || mtag="nomark"
 
-		  local tag="llt-simple-marking-${vtag}-${mtag}"
-		  echo ">> Running ${vtag} trial with marking ${marking}"
-		  NS_LOG="LLTSimple" ../../waf --run "llt-simple --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --marking-enabled=${marking} --video=${video} --run=${tag}"
-		  save_results ${base_from} ${base_to}/${vtag}/${mtag}
-	  done
+        local tag=`printf "llt-simple-marking-%s-%s-%d" ${vtag} ${mtag} ${nodes}`
+        echo ">> Running ${vtag} trial with marking ${marking}"
+        NS_LOG="LLTSimple" ../../waf --run "llt-simple --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --marking-enabled=${marking} --video=${video} --nodes=${nodes} --run=${tag}"
+        save_results ${base_from} ${base_to}/`printf "nodes-%02d" ${nodes}`/${vtag}/${mtag}
+      done
+    done
+    nodes=$((nodes + 1))
   done
+  zipname=`printf "%s-%s.zip" $(basename $(pwd)) ${start}`
   zip -9rD ${zipname} $2
+
   ./mkCBRtable ${zipname}
 }
 
