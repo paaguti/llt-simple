@@ -10,22 +10,23 @@ import argparse
 from zipfile import ZipFile
 
 statRe = re.compile(r'^field (m(ean|in|ax)) (\d+(\.\d+)?)')
-valRe =re.compile(r'^statistic . real time app (delay|jitter)')
+valRe =  re.compile(r'^statistic . real time app (delay|jitter)')
+runRe =  re.compile(r'^run (\S+)')
 
 def main():
     fields = [ 'mean', 'min', 'max' ]
     stream = [ 'audio',  'video' ]
-    mark =   [ 'nomark', 'mark' ]
 
     #
     # Print LATeX tabular head
     #
-    head =   [ 'nodes', 'stream' , 'mark', 'delay', 'min', 'max', 'jitter' ]
+    print("\\multicolum{3}{c}{~} & \\multicolumn{2}{c}{marked} & \\multicolumn{2}{c}{unmarked} \\\\")
+    head =   [ 'stream' , 'nodes', 'mark', 'delay', 'jitter', 'delay', 'jitter' ]
     fmt = '{:6s} & '
-    for h in head:
-        print (fmt.format(h),end='')
-        if h == 'mark': fmt = '{:8s} & '
-        if h == 'max': fmt = '{:8s} \\\\ \\midrule'
+    for i in range(len(head)):
+        print (fmt.format(head[i]),end='')
+        if i == 2: fmt = '{:8s} & '
+        if i == 5: fmt = '{:8s} \\\\ \\midrule'
     print()
 
     # nodes=2
@@ -44,37 +45,65 @@ def main():
             result = dict()
             statType = None
             with simul.open(elem,'r') as myfile:
+                #
+                # Read in new sca file
+                #
+                result = {
+                    "mark"   : {"delay":  { "min":[], "max": [], "mean":[]},
+                                "jitter": { "min":[], "max": [], "mean":[]}},
+                    "nomark" : {"delay":  { "min":[], "max":[], "mean": []},
+                                "jitter": { "min":[], "max":[], "mean": []}}
+                }
+                node = -1
+                total = 0
+                marked = 0
+                stype = ""
                 for l in myfile.readlines():
                     line = l.decode().strip()
                     mStat = statRe.match(line)
                     mVal  = valRe.match(line)
+                    mRun  = runRe.match(line)
+                    if mRun is not None:
+                        base = mRun.group(1)
+                        m = base.split('-')
+                        if args.verbose:
+                            print(">> {}\n{}\n".format(base,repr(m)))
+                        stype = m[3]
+                        total = int(re.sub(r"^0*(\d)$","\\1",m[4]))
+                        marked = int(re.sub(r"^0*(\d)$","\\1",m[5]))
+                        continue
+
                     if mStat is None and mVal is None:
                         continue
                     if mVal is not None:
                         statType = mVal.group(1)
-                        result[statType] = dict()
+                        if statType=='delay':
+                            node += 1
 
                     if mStat is not None:
-                        rDict = result[statType]
-                        rDict[mStat.group(1)] = mStat.group(3)
+                        markType = "mark" if (node < marked) else "nomark"
+                        statTag = mStat.group(1)
+                        statVal = mStat.group(3)
+                        if args.verbose:
+                            print (" >> {} {} {} {} {}".format(node,markType,statType,statTag,statVal),file=sys.stderr)
+                        outer = result[markType]
+                        middle = outer[statType]
+                        inner  = middle[statTag]
+                        inner.append(statVal)
 
                 if args.verbose:
                     print ('Parsed {} and obtained '.format(elem),file=sys.stderr)
                     print (result,file=sys.stderr)
-                base = os.path.basename(elem)
-                base,_=os.path.splitext(base)
-                # if args.verbose:
-                #     print(">> {}\n{}\n".format(base,repr(base.split('-'))))
-                m = base.split('-')
-                try:
-                    nodes = m[6]
-                except:
-                    nodes = '1'
 
-                print ('{:6s} & {:6s} & {:6s} & '.format(nodes, m[4], m[5]), end='')
-                for f in fields:
-                    print ('{:8s} & '.format(result['delay'][f]),end='')
-                print ('{:8s} \\\\'.format(result['jitter']['mean']))
+                print ('{:6} & {:6} & {:6} & '.format(stype, total, marked), end='')
+                for stype in ["mark", "nomark"]:
+                    for mtype in ["delay","jitter"]:
+                        vres = result[stype][mtype]["mean"]
+                        if len(vres) == 0:
+                            res = "-"
+                        else:
+                            res = "{:8.3f}".format(sum([float(x) for x in vres])/len(vres))
+                        print ("{:8}".format(res),end=" \\\\\n" if stype == "nomark" and mtype == "jitter" else " & ")
 
 if __name__ == '__main__':
     main()

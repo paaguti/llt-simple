@@ -264,17 +264,14 @@ main (int argc, char *argv[])
     sender->SetAttribute ("NumPackets",
                           UintegerValue (duration * pps));
 
-    bool markingEnabled = false;
     if (node < markers) {
       sender->SetAttribute ("ToS",
                             UintegerValue (LLT_LOW_LATENCY));
-      markingEnabled = true;
     } else {
       std::cout << " not";
     }
     std::cout << " marking, will start at " << startTime << "secs" << std::endl;
 
-    // std::cout << "Node " << node << "(markers: " << markers <<") "<< (int)markingEnabled << std::endl;
     //
     // Realtime receiver (UE)
     //
@@ -283,25 +280,26 @@ main (int argc, char *argv[])
     receiver->SetStartTime (Seconds (0));
     receiver->SetAttribute("Port", UintegerValue (dlRtPort));
 
-    if (node == 0) {
-      //
-      // Stats collection on the realtime app
-      //
-      data.DescribeRun (experiment, strategy, input, runId);
-      // Add any information we wish to record about this run.
-      data.AddMetadata ("LLT", uint32_t (markingEnabled));
-      // use millisec granularity (See RealtimeReceiver classe)
-      auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-      rtAppDelayStat->SetKey ("real time app delay (ms)");
-      receiver->SetDelayTracker (rtAppDelayStat);
-      data.AddDataCalculator (rtAppDelayStat);
+    //
+    // Stats collection on the realtime app
+    //
+    data.DescribeRun (experiment, strategy, input, runId);
+    // Add any information we wish to record about this run.
+    // data.AddMetadata ("LLT nodes", uint32_t (nodes));
+    // data.AddMetadata ("LLT markers", uint32_t (markers));
+    // data.AddMetadata ("LLT node", uint32_t(node));
 
-      // Jitter (paag)
-      auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-      rtAppJitterStat->SetKey ("real time app jitter (ms)");
-      receiver->SetJitterTracker (rtAppJitterStat);
-      data.AddDataCalculator (rtAppJitterStat);
-    }
+    // use millisec granularity (See RealtimeReceiver classe)
+    auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
+    rtAppDelayStat->SetKey ("real time app delay (ms)");
+    receiver->SetDelayTracker (rtAppDelayStat);
+    data.AddDataCalculator (rtAppDelayStat);
+
+    // Jitter (paag)
+    auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
+    rtAppJitterStat->SetKey ("real time app jitter (ms)");
+    receiver->SetJitterTracker (rtAppJitterStat);
+    data.AddDataCalculator (rtAppJitterStat);
 
     // Downlink pipe filler, no marking whatsoever
     BulkSendHelper greedySender ("ns3::TcpSocketFactory",

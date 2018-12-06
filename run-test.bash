@@ -26,7 +26,7 @@ function main() {
   local base_from=$1 base_to=$2
 
   start=$(date "+%Y%m%d-%H%M")
-  nodes=1
+  nodes=0
   maxnodes=20
   while [ ${nodes} -le ${maxnodes} ]
   do
@@ -35,19 +35,14 @@ function main() {
       [ "$video" == "true" ] && vtag="video"
       [ "$video" == "true" ] || vtag="audio"
 
-      for marking in "false" "true"
-      do
-        [ "$marking" == "true" ] && mtag="mark"
-        [ "$marking" == "true" ] || mtag="nomark"
+	  RUN=$(date '+%s')
+	  RUN=$((RUN % 512))
+      local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${vtag} ${maxnodes} ${nodes}`
+      echo ">> Running ${vtag} trial with ${maxnodes} nodes and ${nodes} markers"
+	  echo ">>   llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --video=${video} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
+	  NS_LOG="LLTSimple" ../../waf --run "llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --video=${video} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
+      save_results ${base_from} ${base_to}/`printf "%02d-%02d" ${maxnodes} ${nodes}`/${vtag}
 
-        [ "$marking" == "true" ] && markers=${nodes}
-        [ "$marking" == "true" ] || markers=0
-
-        local tag=`printf "llt-simple-marking-%s-%s-%d" ${vtag} ${mtag} ${nodes}`
-        echo ">> Running ${vtag} trial with marking ${marking}"
-        NS_LOG="LLTSimple" ../../waf --run "llt-simple --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --video=${video} --markers=${markers} --nodes=${nodes} --run=${tag}"
-        save_results ${base_from} ${base_to}/`printf "nodes-%02d" ${nodes}`/${vtag}/${mtag}
-      done
     done
     nodes=$((nodes + 1))
   done
