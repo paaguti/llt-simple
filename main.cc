@@ -53,7 +53,7 @@ main (int argc, char *argv[])
   uint16_t dlRtPort = 1234;
   uint16_t dlGreedyPort = 5687;
 
-  bool markingEnabled = true;
+  bool withPcaps = false;
   bool videoExperiment = false;
 
   // Create a DataCollector object to hold information about this run.
@@ -64,6 +64,7 @@ main (int argc, char *argv[])
   int duration = 10;			// CBR flow duration in seconds
 
   int nodes = 1;                // Number of UE devices
+  int markers = 1;              // Number of nodes that use LoLa marking for UDP
 
   std::string runId = "run-" + std::to_string (time (NULL));
   std::string experiment ("loss latency tradeoff");
@@ -76,12 +77,14 @@ main (int argc, char *argv[])
   cmd.AddValue ("strategy", "code or parameters being examined in this trial", strategy);
   cmd.AddValue ("run", "unique identifier for this trial for identification in later analysis",
                 runId);
-  cmd.AddValue ("marking-enabled", "whether the LLT marking is enabled on the real-time flow(s).",
-                markingEnabled);
   cmd.AddValue ("video", "Whether we do an audio(def) or a video experiment.",
                 videoExperiment);
+  cmd.AddValue ("pcaps", "Whether to generate PCAP files",
+                withPcaps);
   cmd.AddValue ("nodes", "Number of UEs (def: 1)",
                 nodes);
+  cmd.AddValue ("markers", "Number of UEs using marking(def: 1)",
+                markers);
   cmd.Parse (argc, argv);
 
   // Configure FDD SISO (transmission mode 0) with 6 RBs, i.e. a peak downlink
@@ -142,7 +145,7 @@ main (int argc, char *argv[])
   IPStack.Install (UE);
 
   std::cout << "Creating " << nodes << " nodes" << std::endl;
-
+  // std::cout << " out of which " << markers << " will mark" << std::endl;
   for (int node = 0; node < nodes; node++) {
     Ptr<Node>UENode = UE.Get(node);
     Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
@@ -231,10 +234,8 @@ main (int argc, char *argv[])
     // Start randomly around 2.0 seconds, rounding at the milisecond precision
     //
     double startTime = dround(x1->GetValue(), 0.001);
+
     sender->SetStartTime (Seconds (startTime));
-
-    std::cout << ", will start at " << startTime << "secs" << std::endl;
-
     sender->SetAttribute ("Destination",
                           Ipv4AddressValue (UENodeAddr));
     sender->SetAttribute ("Port",
@@ -260,15 +261,20 @@ main (int argc, char *argv[])
                           UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
     sender->SetAttribute ("Interval",
                           TimeValue (MilliSeconds (1000/pps)));
-
     sender->SetAttribute ("NumPackets",
                           UintegerValue (duration * pps));
 
-    if (markingEnabled) {
+    bool markingEnabled = false;
+    if (node < markers) {
       sender->SetAttribute ("ToS",
                             UintegerValue (LLT_LOW_LATENCY));
+      markingEnabled = true;
+    } else {
+      std::cout << " not";
     }
+    std::cout << " marking, will start at " << startTime << "secs" << std::endl;
 
+    // std::cout << "Node " << node << "(markers: " << markers <<") "<< (int)markingEnabled << std::endl;
     //
     // Realtime receiver (UE)
     //
@@ -314,8 +320,11 @@ main (int argc, char *argv[])
 
   // Dump PHY, MAC, RLC and PDCP level KPIs
   lteHelper->EnableTraces ();
+
   // Get pcaps from the EPC and the SGi
-  SGiLAN.EnablePcapAll ("llt:" + std::to_string (int(markingEnabled)));
+  if (withPcaps) {
+    SGiLAN.EnablePcapAll ("llt:" + std::to_string(nodes) + ":" + std::to_string(markers) );
+  }
 
   // Set the stop time.
   // This is needed otherwise the simulation will last forever, because (among
