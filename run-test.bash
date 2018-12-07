@@ -27,7 +27,7 @@ function main() {
 
   start=$(date "+%Y%m%d-%H%M")
   nodes=0
-  maxnodes=20
+  maxnodes=5
   while [ ${nodes} -le ${maxnodes} ]
   do
     for video in "false" "true"

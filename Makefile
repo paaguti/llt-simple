@@ -15,6 +15,9 @@ ramp: clean-results $(SRCS) | $(OUTDIR)
 
 $(OUTDIR): ; mkdir -p $@
 
+clean:	clean-results
+	rm -vf *~
+
 clean-results:
 	( cd $(TOP) && $(RM) *txt *pcap *sca )
 	rm -rf $(OUTDIR)

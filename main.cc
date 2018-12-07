@@ -289,15 +289,22 @@ main (int argc, char *argv[])
     // data.AddMetadata ("LLT markers", uint32_t (markers));
     // data.AddMetadata ("LLT node", uint32_t(node));
 
+
     // use millisec granularity (See RealtimeReceiver classe)
     auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-    rtAppDelayStat->SetKey ("real time app delay (ms)");
+    if (videoExperiment)
+      rtAppDelayStat->SetKey ("video delay (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+    else
+      rtAppDelayStat->SetKey ("audio delay (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
     receiver->SetDelayTracker (rtAppDelayStat);
     data.AddDataCalculator (rtAppDelayStat);
 
     // Jitter (paag)
     auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-    rtAppJitterStat->SetKey ("real time app jitter (ms)");
+    if (videoExperiment)
+      rtAppJitterStat->SetKey ("video jitter (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+    else
+      rtAppJitterStat->SetKey ("audio jitter (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
     receiver->SetJitterTracker (rtAppJitterStat);
     data.AddDataCalculator (rtAppJitterStat);
 
