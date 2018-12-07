@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""Create the LaTEX tables from the sca files in the ZIP archive
+with the results (from run-test.bash)"""
+
+import os
+import re
+import sys
+import argparse
+from zipfile import ZipFile
+
+import numpy as np
+import matplotlib
+matplotlib.use('PDF')
+import matplotlib.pyplot as plt
+
+valRe =  re.compile(r'^statistic . (audio|video) (delay|jitter) \(([^)]+)\) ?(\d+)/(\d+)[/-](\d+)')
+statRe = re.compile(r'^field (m(ean|in|ax)) (\d+(\.\d+)?)')
+runRe =  re.compile(r'^run (\S+)')
+def main():
+    fields = [ 'mean', 'min', 'max' ]
+    stream = [ 'audio',  'video' ]
+
+    parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog='')
+    parser.add_argument('ZIP', metavar='ZIP', type=str, help='ZIP file with simulation results')
+    parser.add_argument('-V','--verbose',  dest='verbose',action='store_true', help='Print extra info to stderr')
+
+    args = parser.parse_args()
+    if args.verbose:
+        print('Contents of {}:\n '.format(args.ZIP),end='',file=sys.stderr)
+    results = []
+    with ZipFile(args.ZIP) as simul:
+        sca_files = sorted([l for l in simul.namelist() if l.endswith('.sca')])
+        if args.verbose:
+            print("\n ".join(sca_files),file=sys.stderr)
+        for elem in sca_files:
+            result = dict()
+            statType = None
+            with simul.open(elem,'r') as myfile:
+                stream = ''
+                metric = ''
+                node = ''
+                mark = ''
+                for l in myfile.readlines():
+                    line = l.decode().strip()
+                    if args.verbose: print (">> {}".format(line),file=sys.stderr)
+                    mVal = valRe.match(line)
+                    if mVal is not None:
+                        if args.verbose: print (" >> {}".format(repr(mVal.groups())),file=sys.stderr)
+                        stream = mVal.group(1)
+                        metric = mVal.group(2)
+                        node = mVal.group(4)
+                        mark = mVal.group(6)
+                        if stream not in result.keys():
+                            result[stream] = dict()
+                        if metric not in result[stream].keys():
+                            result[stream][metric] = dict()
+                        continue
+                    mStat = statRe.match(line)
+                    if mStat is not None:
+                        # print (" >> {}".format(repr(mStat.groups())),file=sys.stderr)
+                        if mStat.group(1) == "mean":
+                            result[stream][metric][node]=(mStat.group(3),mark)
+            # print(">>>> {}".format(repr(result)),file=sys.stderr)
+            results.append(result)
+
+        # for r in results:
+        #     print ("{}".format(repr(r)))
+        adelay = [ r['audio']['delay'] for r in results if 'audio' in r.keys() ]
+        # print (" {}".format(repr(adelay)))
+        for ad in adelay:
+            for x in ad.keys():
+                y,m = ad[x]
+                print ("{} {} {}".format(m, x, y))
+if __name__ == '__main__':
+    main()

@@ -293,18 +293,18 @@ main (int argc, char *argv[])
     // use millisec granularity (See RealtimeReceiver classe)
     auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
     if (videoExperiment)
-      rtAppDelayStat->SetKey ("video delay (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+      rtAppDelayStat->SetKey ("video delay (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     else
-      rtAppDelayStat->SetKey ("audio delay (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+      rtAppDelayStat->SetKey ("audio delay (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     receiver->SetDelayTracker (rtAppDelayStat);
     data.AddDataCalculator (rtAppDelayStat);
 
     // Jitter (paag)
     auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
     if (videoExperiment)
-      rtAppJitterStat->SetKey ("video jitter (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+      rtAppJitterStat->SetKey ("video jitter (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     else
-      rtAppJitterStat->SetKey ("audio jitter (ms)" + std::to_string(node)+ "/" + std::to_string(nodes) + "/" + std::to_string(int(node<markers)));
+      rtAppJitterStat->SetKey ("audio jitter (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     receiver->SetJitterTracker (rtAppJitterStat);
     data.AddDataCalculator (rtAppJitterStat);
 

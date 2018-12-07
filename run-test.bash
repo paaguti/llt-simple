@@ -49,7 +49,7 @@ function main() {
   zipname=`printf "%s-%s.zip" $(basename $(pwd)) ${start}`
   zip -9rD ${zipname} $2
 
-  ./mkCBRtable ${zipname}
+  ./plotCBR ${zipname}
 }
 
 main $*
