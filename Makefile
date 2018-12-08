@@ -13,6 +13,10 @@ ramp: clean-results $(SRCS) | $(OUTDIR)
 	./run-ramp-test.bash $(TOP) $(OUTDIR)# 5
 	# tree $(OUTDIR)
 
+check: clean-results $(SRCS) | $(OUTDIR)
+	./run-check-test.bash $(TOP) $(OUTDIR)# 5
+	# tree $(OUTDIR)
+
 $(OUTDIR): ; mkdir -p $@
 
 clean:	clean-results

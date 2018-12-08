@@ -126,6 +126,20 @@ main (int argc, char *argv[])
   // nodes at the coordinates (0,0,0).  Refer to the documentation of the ns-3
   // mobility model for how to set a different position or configure node
   // movement.
+#if 0
+  // Install Mobility Model. TODO
+  Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
+  for (uint16_t i = 0; i < numberOfNodes; i++)
+    {
+      positionAlloc->Add (Vector(distance * i, 0, 0));
+    }
+  MobilityHelper mobility;
+  mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+  mobility.SetPositionAllocator(positionAlloc);
+  mobility.Install(enbNodes);
+  mobility.Install(ueNodes);
+#else
+  // Install Mobility Model
   MobilityHelper mobility;
 
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
@@ -133,26 +147,25 @@ main (int argc, char *argv[])
 
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (UE);
-
+#endif
   // Install an LTE protocol stack on the eNB
   auto eNBDevice = lteHelper->InstallEnbDevice (eNB);
 
   // Install an LTE protocol stack on the UEs
-  auto UEDevice = lteHelper->InstallUeDevice (UE);
+  auto UEDevices = lteHelper->InstallUeDevice (UE);
 
   // Install the IP protocol stack on the UE
   InternetStackHelper IPStack;
   IPStack.Install (UE);
 
+  auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer(UEDevices));
   std::cout << "Creating " << nodes << " nodes" << std::endl;
   // std::cout << " out of which " << markers << " will mark" << std::endl;
   for (int node = 0; node < nodes; node++) {
     Ptr<Node>UENode = UE.Get(node);
-    Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
 
-    assert(UENetDev == UEDevice.Get (node));
-
-    auto UEIpIface = epcHelper->AssignUeIpv4Address (NetDeviceContainer(UENetDev));
+    // Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
+    // assert(UENetDev == UEDevices.Get (node));
 
     // Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
     // Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
@@ -164,21 +177,32 @@ main (int argc, char *argv[])
     ueStaticRouting->SetDefaultRoute (epcHelper->GetUeDefaultGatewayAddress (), 1);
   }
 
-  // Attach the UE to an eNB. This will configure the UE according to the eNB
-  // settings, and create an RRC connection between them.
-  // A side-effect of this call is to activate the default bearer.
-  lteHelper->Attach (UEDevice, eNBDevice.Get (0));
-
-  // Add a dedicated low-latency bearer for applications marking
-  // their traffic with the LLT PHB codepoint for low-latency traffic
-  // https://tools.ietf.org/html/draft-you-tsvwg-latency-loss-tradeoff-00#section-4.4
   auto tft = Create<EpcTft> ();
   EpcTft::PacketFilter pf;
   pf.typeOfService = LLT_LOW_LATENCY;
   pf.typeOfServiceMask = LLT_LOW_LATENCY;
   tft->Add (pf);
-  lteHelper->ActivateDedicatedEpsBearer (UEDevice, EpsBearer (EpsBearer::NGBR_VOICE_VIDEO_GAMING),
-                                         tft);
+
+  // Attach the UEs to the eNB. This will configure the UE according to the eNB
+  // settings, and create an RRC connection between them.
+  // A side-effect of this call is to activate the default bearer.
+
+  for (int node = 0; node < nodes; node++)
+    {
+      std::cout << "Attaching node " << std::to_string(node + 1) << std::endl;
+
+      lteHelper->Attach (UEDevices.Get(node), eNBDevice.Get (0));
+
+      // Add a dedicated low-latency bearer for applications marking
+      // their traffic with the LLT PHB codepoint for low-latency traffic
+      // https://tools.ietf.org/html/draft-you-tsvwg-latency-loss-tradeoff-00#section-4.4
+
+      lteHelper->ActivateDedicatedEpsBearer (UEDevices.Get(node),
+                                             EpsBearer (EpsBearer::NGBR_VOICE_VIDEO_GAMING),
+                                             tft);
+    }
+
+
 
   // Create an application server in the SGi-LAN
   NodeContainer appServer;
@@ -215,7 +239,7 @@ main (int argc, char *argv[])
 
     Ptr<Node>UENode = UE.Get(node);
     Ptr<NetDevice>UENetDev = UENode -> GetDevice(0);
-    assert(UENetDev == UEDevice.Get (node));
+    assert(UENetDev == UEDevices.Get (node));
 
     Ptr<Ipv4> UENodeIpv4 = UENode->GetObject<Ipv4>();
     Ipv4Address UENodeAddr = UENodeIpv4->GetAddress(1,0).GetLocal();
