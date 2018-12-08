@@ -66,11 +66,18 @@ def main():
 
         # for r in results:
         #     print ("{}".format(repr(r)))
-        adelay = [ r['audio']['delay'] for r in results if 'audio' in r.keys() ]
+
+        prt = dict()
+        prt['ad'] =  [ r['audio']['delay'] for r in results  if 'audio' in r.keys() ]
+        prt['aj'] =  [ r['audio']['jitter'] for r in results if 'audio' in r.keys() ]
+        prt['vd'] =  [ r['video']['delay'] for r in results  if 'video' in r.keys() ]
+        prt['vj'] =  [ r['video']['jitter'] for r in results if 'video' in r.keys() ]
         # print (" {}".format(repr(adelay)))
-        for ad in adelay:
-            for x in ad.keys():
-                y,m = ad[x]
-                print ("{} {} {}".format(m, x, y))
+
+        for k in prt.keys():
+            for ad in prt[k]:
+                for x in ad.keys():
+                    y,m = ad[x]
+                    print ("{}{} {} {}".format(k, m, x, y))
 if __name__ == '__main__':
     main()

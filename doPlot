@@ -1,3 +1,38 @@
 #!/bin/bash
 zip=${1:-llt-simple-20181207-1305.zip}
-sed "s/@ZIPFILE@/${zip}/g" test.plt | gnuplot -persist
+TMPFILE=pdftest.plt
+PLOTFILE=test.plt
+NODES=21
+
+YMAX1=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^a[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
+DYMAX1=$((YMAX1 % 50))
+YMAX1=$((YMAX1 - DYMAX1 + 50))
+
+YMAX2=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^v[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
+DYMAX2=$((YMAX2 % 50))
+YMAX2=$((YMAX2 - DYMAX2 + 50))
+
+NODES=$(./plotCBR ${zip} | tail -1 | cut '-d ' -f2)
+NODES=$((NODES + 1))
+
+echo NODES=${NODES}
+echo YMAX1=${YMAX1}
+echo YMAX2=${YMAX2}
+
+if [ -z "$2" ]; then
+  sed "s/@ZIPFILE@/${zip}/g
+s/@YMAX1@/${YMAX1}/g
+s/@YMAX2@/${YMAX2}/g
+s/@NODES@/${NODES}/g" ${PLOTFILE} | gnuplot -persist
+else
+  cat >${TMPFILE} << __EOF__
+set terminal pdf
+set output "$2"
+__EOF__
+  sed "s/@ZIPFILE@/${zip}/g
+s/@YMAX1@/${YMAX1}/g
+s/@YMAX2@/${YMAX2}/g
+s/@NODES@/${NODES}/g" ${PLOTFILE} >> ${TMPFILE}
+  gnuplot ${TMPFILE}
+  rm ${TMPFILE}
+fi
