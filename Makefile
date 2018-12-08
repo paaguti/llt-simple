@@ -5,16 +5,22 @@ OUTDIR := results
 
 SRCS := $(wildcard *.cc *.h)
 
+#
+# 20 nodes, ramp with amount of nodes marking
+#
 run: clean-results $(SRCS) | $(OUTDIR)
-	./run-test.bash $(TOP) $(OUTDIR)
+	./run-test.bash $(TOP) $(OUTDIR) 20
 	# tree $(OUTDIR)
 
+#
+# ramp from 1 to 20 marking nodes
+#
 ramp: clean-results $(SRCS) | $(OUTDIR)
-	./run-ramp-test.bash $(TOP) $(OUTDIR)# 5
+	./run-ramp-test.bash $(TOP) $(OUTDIR)
 	# tree $(OUTDIR)
 
 check: clean-results $(SRCS) | $(OUTDIR)
-	./run-check-test.bash $(TOP) $(OUTDIR)# 5
+	./run-check-test.bash $(TOP) $(OUTDIR)
 	# tree $(OUTDIR)
 
 $(OUTDIR): ; mkdir -p $@
