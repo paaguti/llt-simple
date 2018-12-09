@@ -9,10 +9,10 @@ import sys
 import argparse
 from zipfile import ZipFile
 
-import numpy as np
-import matplotlib
-matplotlib.use('PDF')
-import matplotlib.pyplot as plt
+# import numpy as np
+# import matplotlib
+# matplotlib.use('PDF')
+# import matplotlib.pyplot as plt
 
 valRe =  re.compile(r'^statistic . (\S+) (delay|jitter) \(([^)]+)\) ?(\d+)/(\d+)[/-](\d+)')
 statRe = re.compile(r'^field (m(ean|in|ax)) (\d+(\.\d+)?)')
@@ -51,6 +51,7 @@ def main():
                         metric = mVal.group(2)
                         node = mVal.group(4)
                         mark = mVal.group(6)
+                        if args.verbose: print (" >>> {} {} {} {}".format(stream,metric,node,mark),file=sys.stderr)
                         if stream not in result.keys():
                             result[stream] = dict()
                         if metric not in result[stream].keys():
@@ -64,21 +65,25 @@ def main():
             # print(">>>> {}".format(repr(result)),file=sys.stderr)
             results.append(result)
 
-        # for r in results:
-        #     print ("{}".format(repr(r)))
+        if args.verbose:
+            for r in results:
+                print ("{}".format(repr(r)),file=sys.stderr)
 
         keys = []
         prt = dict()
         for r in results:
-            stream = list(r.keys())[0]
-            metric = list(r[stream].keys())[0]
-            nkey = "{}{}".format(stream[0],metric[0])
-            if nkey not in keys:
-                keys.append(nkey)
-                prt[nkey] =  [ r[stream][metric] for r in results  if stream in r.keys() ]
+            # if args.verbose: print (" ++ {}".format(repr(r.keys())),file=sys.stderr)
+            for stream in r.keys():
+                # if args.verbose: print (" +++ {}".format(repr(r[stream].keys())),file=sys.stderr)
+                for metric in r[stream].keys():
+                    nkey = "{}{}".format(stream[0],metric[0])
+                    # if args.verbose: print (" ++++ {}".format(nkey),file=sys.stderr)
+                    if nkey not in keys:
+                        keys.append(nkey)
+                        prt[nkey] =  [ r[stream][metric] for r in results  if stream in r.keys() ]
 
-        print (" {}".format(repr(keys)))
-        print (" {}".format(repr(prt)))
+        # print (" {}".format(repr(keys)))
+        # print (" {}".format(repr(prt)))
 
         for k in prt.keys():
             for ad in prt[k]:

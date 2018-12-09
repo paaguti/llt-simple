@@ -60,6 +60,8 @@ def main():
                 stype = ""
                 for l in myfile.readlines():
                     line = l.decode().strip()
+                    if args.verbose:
+                        print("> {}".format(line),file=sys.stderr)
                     mStat = statRe.match(line)
                     mVal  = valRe.match(line)
                     mRun  = runRe.match(line)

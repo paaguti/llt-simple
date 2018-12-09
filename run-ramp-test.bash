@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# -*- mode: Shell-script; indent-tabs-mode: nil; sh-basic-offset: 2; sh-indentation: 2; -*-
 set -eu
 set -o pipefail
 
@@ -27,42 +27,51 @@ function main() {
   local base_from=$1 base_to=$2
 
   start=$(date "+%Y%m%d-%H%M")
-  nodes=1
-  maxnodes=${3:-20}
-  while [ ${nodes} -le ${maxnodes} ]
+  nodes=${3:-20}
+  # UNCOMMENT for constant bit rate of 720kbps
+  # for RATE in 100 200 250 500
+  RATE=100
+  for SIZE in 900 800 450 400
   do
-    for video in "false" "true"
-    do
-      [ "$video" == "true" ] && vtag="video"
-      [ "$video" == "true" ] || vtag="audio"
+	# UNCOMMENT for constant bit rate of 720kbps
+    #     [ ${RATE} -eq 100 ] && stag="Big"
+    #     [ ${RATE} -eq 200 ] && stag="Medium"
+    #     [ ${RATE} -eq 250 ] && stag="Small"
+    #     [ ${RATE} -eq 500 ] && stag="Tiny"
+	[ ${SIZE} -eq 900 ] && stag="very"
+	[ ${SIZE} -eq 800 ] && stag="high"
+	[ ${SIZE} -eq 450 ] && stag="medium"
+	[ ${SIZE} -eq 400 ] && stag="low"
 
-      for marking in "false" "true"
-      do
-        [ "$marking" == "true" ] && mtag="mark"
-        [ "$marking" == "true" ] || mtag="nomark"
+    marking="true"
 
-        [ "$marking" == "true" ] && markers=${nodes}
-        [ "$marking" == "true" ] || markers=0
+    [ "$marking" == "true" ] && markers=${nodes}
+    [ "$marking" == "true" ] || markers=0
+
+	# UNCOMMENT for constant bit rate of 720kbps
+    # SIZE=$((90000 / RATE))
+
+	echo ">> Running ${stag} trial with ${nodes} nodes and ${markers} markers"
+    echo ">> with ${RATE} pps and packets of ${SIZE} bytes"
 
 		RUN=$(date '+%s')
 		RUN=$((RUN % 512))
-		local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${vtag} ${maxnodes} ${nodes}`
-		cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
-		if [ "$video" == "true" ]; then
-			cmd="${cmd} --pps=100 --bytes=900"
-		fi
-		echo ">> Running ${vtag} trial with ${maxnodes} nodes and ${nodes} markers"
+
+		local tag=`printf "llt-simple-ramp-%s-%02d-%03d-%3d" ${stag} ${nodes} ${RATE} ${SIZE}`
+
+		cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${markers} --nodes=${nodes} --run=${tag}"
+    cmd="${cmd} --stag=${stag}"
+    cmd="${cmd} --pps=${RATE} --bytes=${SIZE}"
 		echo ">>   ${cmd}"
+
 		NS_LOG="LLTSimple" ../../waf --run "${cmd}"
-        save_results ${base_from} ${base_to}/`printf "nodes-%02d" ${nodes}`/${vtag}/${mtag}
-      done
-    done
-    nodes=$((nodes + 1))
+
+    save_results ${base_from} ${base_to}/`printf "flow-%03d-%03d" ${RATE} ${SIZE}`
   done
   zipname=`printf "%s-%s.zip" $(basename $(pwd)) ${start}`
   zip -9rD ${zipname} $2
 
-  ./mkCBRtable ${zipname}
+  ./plotCBR ${zipname}
 }
 
 main $*

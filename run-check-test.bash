@@ -37,7 +37,7 @@ function main() {
   RUN=$(date '+%s')
   RUN=$((RUN % 512))
   local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${vtag} ${maxnodes} ${nodes}`
-  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
+  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag} --stag=${vtag}"
   if [ "$video" == "true" ]; then
 	  cmd="${cmd} --pps=100 --bytes=900"
   fi

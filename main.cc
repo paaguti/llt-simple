@@ -70,12 +70,12 @@ main (int argc, char *argv[])
   std::string strategy ("single-ue");
   std::string input;
 
+  // default audio:
+  std::string stag("audio");    // the tag for the statistics header
   // simulate downstream real-time audio, specifically:
   // 64kbps PCM audio packetized in 20ms increments
   // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
   // 200 / 0.02 bytes/second = 80kbps
-
-  // default audio:
   int packet = 160;				// packet size: 160 PCM
   int pps = 50;					// packet rate: 20ms (50 pps)
 
@@ -90,8 +90,10 @@ main (int argc, char *argv[])
                 withPcaps);
   cmd.AddValue ("nodes", "Number of UEs (def: 1)",
                 nodes);
-  cmd.AddValue ("markers", "Number of UEs using marking(def: 1)",
+  cmd.AddValue ("markers", "Number of UEs using marking (def: 1)",
                 markers);
+  cmd.AddValue ("stag", "Tag for the statistics header (def: audio)",
+                stag);
   cmd.AddValue ("bytes", "The packet size (def: 160 bytes for audio)",
                 packet);
   cmd.AddValue ("pps", "The packet rate (def: 50 pps for audio)",
@@ -278,8 +280,6 @@ main (int argc, char *argv[])
                           UintegerValue (dlRtPort));
 
 
-    bool videoExperiment = (packet  != 160 || pps != 50);
-
     sender->SetAttribute ("PacketSize",
                           UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP
     sender->SetAttribute ("Interval",
@@ -315,19 +315,13 @@ main (int argc, char *argv[])
 
     // use millisec granularity (See RealtimeReceiver classe)
     auto rtAppDelayStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-    if (videoExperiment)
-      rtAppDelayStat->SetKey ("video delay (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
-    else
-      rtAppDelayStat->SetKey ("audio delay (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
+    rtAppDelayStat->SetKey (stag + " delay (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     receiver->SetDelayTracker (rtAppDelayStat);
     data.AddDataCalculator (rtAppDelayStat);
 
     // Jitter (paag)
     auto rtAppJitterStat = CreateObject<MinMaxAvgTotalCalculator<int64_t>> ();
-    if (videoExperiment)
-      rtAppJitterStat->SetKey ("video jitter (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
-    else
-      rtAppJitterStat->SetKey ("audio jitter (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
+    rtAppJitterStat->SetKey (stag + " jitter (ms) " + std::to_string(node + 1)+ "/" + std::to_string(nodes) + "-" + std::to_string(int(node<markers)));
     receiver->SetJitterTracker (rtAppJitterStat);
     data.AddDataCalculator (rtAppJitterStat);
 

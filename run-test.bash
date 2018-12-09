@@ -41,8 +41,9 @@ function main() {
 	  RUN=$((RUN % 512))
       local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${vtag} ${maxnodes} ${nodes}`
       echo ">> Running ${vtag} trial with ${maxnodes} nodes and ${nodes} markers"
-	  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
+	  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag} --stag={vtag}"
 	  if [ "$video" == "true" ]; then
+		  # 720kbps
 		  cmd="${cmd} --pps=100 --bytes=900"
 	  fi
 	  echo ">>   ${cmd}"

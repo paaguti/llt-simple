@@ -16,7 +16,7 @@ run: clean-results $(SRCS) | $(OUTDIR)
 # ramp from 1 to 20 marking nodes
 #
 ramp: clean-results $(SRCS) | $(OUTDIR)
-	./run-ramp-test.bash $(TOP) $(OUTDIR)
+	./run-ramp-test.bash $(TOP) $(OUTDIR) 10
 	# tree $(OUTDIR)
 
 check: clean-results $(SRCS) | $(OUTDIR)

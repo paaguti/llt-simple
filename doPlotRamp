@@ -4,11 +4,11 @@ TMPFILE=pdftest.plt
 PLOTFILE=test.plt
 NODES=21
 
-YMAX1=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^a[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
+YMAX1=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^[BM][dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
 DYMAX1=$((YMAX1 % 50))
 YMAX1=$((YMAX1 - DYMAX1 + 50))
 
-YMAX2=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^v[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
+YMAX2=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^[ST][dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
 DYMAX2=$((YMAX2 % 50))
 YMAX2=$((YMAX2 - DYMAX2 + 50))
 
@@ -24,16 +24,16 @@ if [ -z "$2" ]; then
 s/@YMAX1@/${YMAX1}/g
 s/@YMAX2@/${YMAX2}/g
 s/@NODES@/${NODES}/g
-s/@TIT1@/Audio/g
-s/@TIT2@/Video/g
-s/@T1@/ad0/g
-s/@T2@/aj0/g
-s/@T3@/ad1/g
-s/@T4@/aj1/g
-s/@T5@/vd0/g
-s/@T6@/vj0/g
-s/@T7@/vd1/g
-s/@T8@/vj1/g" ${PLOTFILE} | gnuplot -persist
+s/@TIT1@/Big-Medium/g
+s/@TIT2@/Small-Tiny/g
+s/@T1@/Bd1/g
+s/@T2@/Bj1/g
+s/@T3@/Md1/g
+s/@T4@/Mj1/g
+s/@T5@/Sd1/g
+s/@T6@/Sj1/g
+s/@T7@/Td1/g
+s/@T8@/Tj1/g" ${PLOTFILE} | gnuplot -persist
 else
   cat >${TMPFILE} << __EOF__
 set terminal pdf
@@ -43,16 +43,16 @@ __EOF__
 s/@YMAX1@/${YMAX1}/g
 s/@YMAX2@/${YMAX2}/g
 s/@NODES@/${NODES}/g
-s/@TIT1@/Audio/g
-s/@TIT2@/Video/g
-s/@T1@/ad1/g
-s/@T2@/aj1/g
-s/@T3@/ad1/g
-s/@T4@/aj1/g
-s/@T5@/vd0/g
-s/@T6@/vj0/g
-s/@T7@/vd1/g
-s/@T8@/vj1/g" ${PLOTFILE} >> ${TMPFILE}
+s/@TIT1@/Big-Medium/g
+s/@TIT2@/Small-Tiny/g
+s/@T1@/Bd1/g
+s/@T2@/Bj1/g
+s/@T3@/Md1/g
+s/@T4@/Mj1/g
+s/@T5@/Sd1/g
+s/@T6@/Sj1/g
+s/@T7@/Td1/g
+s/@T8@/Tj1/g" ${PLOTFILE} >> ${TMPFILE}
   gnuplot ${TMPFILE}
-  rm ${TMPFILE}
+  # rm ${TMPFILE}
 fi
