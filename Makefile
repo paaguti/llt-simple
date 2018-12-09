@@ -20,8 +20,8 @@ ramp: clean-results $(SRCS) | $(OUTDIR)
 	# tree $(OUTDIR)
 
 check: clean-results $(SRCS) | $(OUTDIR)
-	./run-check-test.bash $(TOP) $(OUTDIR)
-	# tree $(OUTDIR)
+	./run-check-test.bash $(TOP) $(OUTDIR)/check-03-05
+	rm -rf $(OUTDIR)
 
 $(OUTDIR): ; mkdir -p $@
 

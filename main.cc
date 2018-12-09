@@ -54,7 +54,6 @@ main (int argc, char *argv[])
   uint16_t dlGreedyPort = 5687;
 
   bool withPcaps = false;
-  bool videoExperiment = false;
 
   // Create a DataCollector object to hold information about this run.
   // Collect data for UE node 0 only
@@ -71,20 +70,33 @@ main (int argc, char *argv[])
   std::string strategy ("single-ue");
   std::string input;
 
+  // simulate downstream real-time audio, specifically:
+  // 64kbps PCM audio packetized in 20ms increments
+  // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
+  // 200 / 0.02 bytes/second = 80kbps
+
+  // default audio:
+  int packet = 160;				// packet size: 160 PCM
+  int pps = 50;					// packet rate: 20ms (50 pps)
+
   // Set up command line parameters used to control the experiment.
   CommandLine cmd;
   cmd.AddValue ("experiment", "study of which this trial is a member", experiment);
   cmd.AddValue ("strategy", "code or parameters being examined in this trial", strategy);
   cmd.AddValue ("run", "unique identifier for this trial for identification in later analysis",
                 runId);
-  cmd.AddValue ("video", "Whether we do an audio(def) or a video experiment.",
-                videoExperiment);
+
   cmd.AddValue ("pcaps", "Whether to generate PCAP files",
                 withPcaps);
   cmd.AddValue ("nodes", "Number of UEs (def: 1)",
                 nodes);
   cmd.AddValue ("markers", "Number of UEs using marking(def: 1)",
                 markers);
+  cmd.AddValue ("bytes", "The packet size (def: 160 bytes for audio)",
+                packet);
+  cmd.AddValue ("pps", "The packet rate (def: 50 pps for audio)",
+                pps);
+
   cmd.Parse (argc, argv);
 
   // Configure FDD SISO (transmission mode 0) with 6 RBs, i.e. a peak downlink
@@ -265,21 +277,8 @@ main (int argc, char *argv[])
     sender->SetAttribute ("Port",
                           UintegerValue (dlRtPort));
 
-    // simulate downstream real-time audio, specifically:
-    // 64kbps PCM audio packetized in 20ms increments
-    // IP/UDP/RTP/PCM 20+8+12+160=200, required BW is
-    // 200 / 0.02 bytes/second = 80kbps
 
-    // default audio:
-    int packet = 160;				// packet size: 160 PCM
-    int pps = 50;					// packet rate: 20ms (50 pps)
-
-    if (videoExperiment) {
-      // Video: RTP, 900 bytes-100pps
-      // Required bandwidth: 940 bytes/pkt * 8bits/byte * 100 pkt/s = 752 kbps
-      packet = 900;
-      pps = 100;
-    }
+    bool videoExperiment = (packet  != 160 || pps != 50);
 
     sender->SetAttribute ("PacketSize",
                           UintegerValue (packet + 20+8+12)); // +IP/UDP/RTP

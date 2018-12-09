@@ -11,6 +11,7 @@ set -o pipefail
 # - EpcTft
 
 declare -r S1_BW=50Mbps
+declare -r pcaps="false"
 
 # $1: source
 # $2: destination
@@ -18,8 +19,8 @@ function save_results() {
   local d="$2"
   echo "saving test results to ${d}"
   mkdir -p ${d}
-  # mv $1/*.{txt,pcap,sca} ${d}
-  mv $1/*.{txt,sca} ${d}
+  [ ${pcaps} == "true" ] && mv -vf $1/*.{txt,pcap,sca} ${d}
+  [ ${pcaps} == "true" ] || mv -vf $1/*.{txt,sca} ${d}
 }
 
 function main() {
@@ -28,19 +29,24 @@ function main() {
   start=$(date "+%Y%m%d-%H%M")
   nodes=3
   maxnodes=5
-  video="false"
+  video="true"
 
   [ "$video" == "true" ] && vtag="video"
   [ "$video" == "true" ] || vtag="audio"
+
   RUN=$(date '+%s')
   RUN=$((RUN % 512))
   local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${vtag} ${maxnodes} ${nodes}`
+  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
+  if [ "$video" == "true" ]; then
+	  cmd="${cmd} --pps=100 --bytes=900"
+  fi
   echo ">> Running ${vtag} trial with ${maxnodes} nodes and ${nodes} markers"
-  echo ">>   llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --video=${video} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
-  NS_LOG="LLTSimple" ../../waf --run "llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --video=${video} --markers=${nodes} --nodes=${maxnodes} --run=${tag}"
-  save_results ${base_from} ${base_to}/`printf "%02d-%02d" ${maxnodes} ${nodes}`/${vtag}
+  echo ">>   ${cmd}"
+  NS_LOG="LLTSimple" ../../waf --run "${cmd}"
 
-  zipname=`printf "%s-%s.zip" $(basename $(pwd)) ${start}`
+  save_results $1 $2
+  zipname=`printf "%s-%s.zip" $(basename $2) ${start}`
   zip -9rD ${zipname} $2
 
   ./plotCBR ${zipname}
