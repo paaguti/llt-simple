@@ -3,37 +3,79 @@ zip=${1:-llt-simple-20181207-1305.zip}
 TMPFILE=pdftest.plt
 PLOTFILE=test.plt
 NODES=21
+DEBUG="f"
 
-YMAX1=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^a[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
-DYMAX1=$((YMAX1 % 50))
-YMAX1=$((YMAX1 - DYMAX1 + 50))
+function round() {
+	local VAL=$1
+	local RND=$2
+	DELTA=$((VAL % RND))
+	echo $((VAL - DELTA + RND))
+}
 
-YMAX2=$(./plotCBR ${zip} | awk 'BEGIN{max=0} /^v[dj]/ { if ($3 > max) max=$3; } END {print int(max)}')
-DYMAX2=$((YMAX2 % 50))
-YMAX2=$((YMAX2 - DYMAX2 + 50))
+RUNS=$(./plotCBR --run ${zip})
+echo "RUNS: ${RUNS}"
+tags=""
+RID=1
+for run in ${RUNS}
+do
+	FIRST=$(echo ${run} | sed -E 's/^(.).*/\1/g')
+	AWKFILTER=$(printf 'BEGIN{max=0} /^%c[dj]/ { if ($3 > max) max=$3; } END {print int(max)}' ${FIRST})
+	[ "${DEBUG}" == "t" ] && echo AWKFILTER=$AWKFILTER
+	YMAX[${RID}]=$(./plotCBR ${zip} | awk "${AWKFILTER}")
+	[ "${DEBUG}" == "t" ] && echo YMAX[${RID}]=${YMAX[${RID}]}
+	YMAX[${RID}]=$(round ${YMAX[${RID}]} 50)
+	tags="${tags} $(printf '%cd0 %cd1 %cj0 %cj1' ${FIRST} ${FIRST} ${FIRST} ${FIRST})"
+	[ "${DEBUG}" == "t" ] && echo tags="${tags}"
+	RID=$((RID + 1))
+done
 
 NODES=$(./plotCBR ${zip} | tail -1 | cut '-d ' -f2)
 NODES=$((NODES + 1))
 
+YMAX1=${YMAX[1]}
+YMAX2=${YMAX[2]}
+
 echo NODES=${NODES}
 echo YMAX1=${YMAX1}
 echo YMAX2=${YMAX2}
+
+SEDTAG=1
+for tag in $tags
+do
+	[ "${DEBUG}" == "t" ] && echo "${SEDTAG} --> ${tag}"
+	SEDCMD="${SEDCMD}
+s/@T${SEDTAG}@/${tag}/g "
+	SEDTAG=$((SEDTAG + 1))
+done
+
+SEDTAG=1
+for tag in $tags
+do
+  TIT=`echo ${tag} | awk '/^.d0/ { print "delay no m" }
+/^.d1/ { print "delay mark" }
+/^.j0/ { print "jitter no m" }
+/^.j1/ { print "jitter mark" }'`
+  SEDCMD="${SEDCMD}
+s/@G${SEDTAG}@/${TIT}/g"
+  SEDTAG=$((SEDTAG + 1))
+done
+
+SEDTAG=1
+for title in $(./plotCBR --run ${zip})
+do
+	SEDCMD="${SEDCMD}
+s/@TIT${SEDTAG}@/${title}/g"
+	SEDTAG=$((SEDTAG + 1))
+done
+[ "${DEBUG}" == "t" ] && echo ${SEDCMD}
 
 if [ -z "$2" ]; then
   sed "s/@ZIPFILE@/${zip}/g
 s/@YMAX1@/${YMAX1}/g
 s/@YMAX2@/${YMAX2}/g
 s/@NODES@/${NODES}/g
-s/@TIT1@/Audio/g
-s/@TIT2@/Video/g
-s/@T1@/ad0/g
-s/@T2@/aj0/g
-s/@T3@/ad1/g
-s/@T4@/aj1/g
-s/@T5@/vd0/g
-s/@T6@/vj0/g
-s/@T7@/vd1/g
-s/@T8@/vj1/g" ${PLOTFILE} | gnuplot -persist
+s/@KEY@/set key at 7,200;/g
+${SEDCMD}" ${PLOTFILE} | gnuplot -persist
 else
   cat >${TMPFILE} << __EOF__
 set terminal pdf
@@ -43,16 +85,8 @@ __EOF__
 s/@YMAX1@/${YMAX1}/g
 s/@YMAX2@/${YMAX2}/g
 s/@NODES@/${NODES}/g
-s/@TIT1@/Audio/g
-s/@TIT2@/Video/g
-s/@T1@/ad1/g
-s/@T2@/aj1/g
-s/@T3@/ad1/g
-s/@T4@/aj1/g
-s/@T5@/vd0/g
-s/@T6@/vj0/g
-s/@T7@/vd1/g
-s/@T8@/vj1/g" ${PLOTFILE} >> ${TMPFILE}
+s/@KEY@/set key at 7,200;/g
+${SEDCMD}" ${PLOTFILE} >> ${TMPFILE}
   gnuplot ${TMPFILE}
-  rm ${TMPFILE}
+  # rm ${TMPFILE}
 fi

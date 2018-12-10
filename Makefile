@@ -1,7 +1,9 @@
+# -*- Mode:Makefile; indent-tabs-mode: t; tab-width: 4; -*-
 .DEFAULT_GOAL := run
 
 TOP := ../..
 OUTDIR := results
+RM := rm -vf
 
 SRCS := $(wildcard *.cc *.h)
 
@@ -10,14 +12,14 @@ SRCS := $(wildcard *.cc *.h)
 #
 run: clean-results $(SRCS) | $(OUTDIR)
 	./run-test.bash $(TOP) $(OUTDIR) 20
-	# tree $(OUTDIR)
+	rm -rf $(OUTDIR)
 
 #
 # ramp from 1 to 20 marking nodes
 #
 ramp: clean-results $(SRCS) | $(OUTDIR)
-	./run-ramp-test.bash $(TOP) $(OUTDIR) 10
-	# tree $(OUTDIR)
+	./run-ramp-test.bash $(TOP) $(OUTDIR) 20
+	rm -rf $(OUTDIR)
 
 check: clean-results $(SRCS) | $(OUTDIR)
 	./run-check-test.bash $(TOP) $(OUTDIR)/check-03-05
@@ -29,5 +31,5 @@ clean:	clean-results
 	rm -vf *~
 
 clean-results:
-	( cd $(TOP) && $(RM) *txt *pcap *sca )
+	( cd $(TOP) && $(RM) *.{txt,pcap,sca} )
 	rm -rf $(OUTDIR)

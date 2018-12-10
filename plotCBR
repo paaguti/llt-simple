@@ -16,22 +16,24 @@ from zipfile import ZipFile
 
 valRe =  re.compile(r'^statistic . (\S+) (delay|jitter) \(([^)]+)\) ?(\d+)/(\d+)[/-](\d+)')
 statRe = re.compile(r'^field (m(ean|in|ax)) (\d+(\.\d+)?)')
-runRe =  re.compile(r'^run (\S+)')
+runRe =  re.compile(r'^run (\S+)-([^-]*)-(\d\d-\d\d)')
 def main():
     fields = [ 'mean', 'min', 'max' ]
     stream = [ 'audio',  'video' ]
+    runs = []
 
     parser = argparse.ArgumentParser(description=__doc__,formatter_class=argparse.RawDescriptionHelpFormatter,epilog='')
     parser.add_argument('ZIP', metavar='ZIP', type=str, help='ZIP file with simulation results')
-    parser.add_argument('-V','--verbose',  dest='verbose',action='store_true', help='Print extra info to stderr')
+    parser.add_argument('-V','--verbose',  dest='verbose', default=0, action='count', help='Print extra info to stderr')
+    parser.add_argument('-r','--run',  dest='run', action='store_true', help='Print the run information only')
 
     args = parser.parse_args()
-    if args.verbose:
+    if args.verbose > 0:
         print('Contents of {}:\n '.format(args.ZIP),end='',file=sys.stderr)
     results = []
     with ZipFile(args.ZIP) as simul:
         sca_files = sorted([l for l in simul.namelist() if l.endswith('.sca')])
-        if args.verbose:
+        if args.verbose > 0:
             print("\n ".join(sca_files),file=sys.stderr)
         for elem in sca_files:
             result = dict()
@@ -43,15 +45,23 @@ def main():
                 mark = ''
                 for l in myfile.readlines():
                     line = l.decode().strip()
-                    if args.verbose: print (">> {}".format(line),file=sys.stderr)
+                    if args.verbose == 2: print (">> {}".format(line),file=sys.stderr)
+                    if args.run:
+                        mRun = runRe.match(line)
+                        if mRun is not None:
+                            # print(mRun.groups())
+                            runId = mRun.group(2)
+                            if runId not in runs:
+                                runs.append(runId)
+                        continue
                     mVal = valRe.match(line)
                     if mVal is not None:
-                        if args.verbose: print (" >> {}".format(repr(mVal.groups())),file=sys.stderr)
+                        if args.verbose == 1: print (" >> {}".format(repr(mVal.groups())),file=sys.stderr)
                         stream = mVal.group(1)
                         metric = mVal.group(2)
                         node = mVal.group(4)
                         mark = mVal.group(6)
-                        if args.verbose: print (" >>> {} {} {} {}".format(stream,metric,node,mark),file=sys.stderr)
+                        if args.verbose == 1: print (" >>> {} {} {} {}".format(stream,metric,node,mark),file=sys.stderr)
                         if stream not in result.keys():
                             result[stream] = dict()
                         if metric not in result[stream].keys():
@@ -65,30 +75,34 @@ def main():
             # print(">>>> {}".format(repr(result)),file=sys.stderr)
             results.append(result)
 
-        if args.verbose:
+        if args.verbose == 1:
             for r in results:
                 print ("{}".format(repr(r)),file=sys.stderr)
 
         keys = []
         prt = dict()
         for r in results:
-            # if args.verbose: print (" ++ {}".format(repr(r.keys())),file=sys.stderr)
+            if args.verbose == 3: print (" ++ {}".format(repr(r.keys())),file=sys.stderr)
             for stream in r.keys():
-                # if args.verbose: print (" +++ {}".format(repr(r[stream].keys())),file=sys.stderr)
+                if args.verbose == 3: print (" +++ {}".format(repr(r[stream].keys())),file=sys.stderr)
                 for metric in r[stream].keys():
                     nkey = "{}{}".format(stream[0],metric[0])
-                    # if args.verbose: print (" ++++ {}".format(nkey),file=sys.stderr)
+                    if args.verbose == 3: print (" ++++ {}".format(nkey),file=sys.stderr)
                     if nkey not in keys:
                         keys.append(nkey)
                         prt[nkey] =  [ r[stream][metric] for r in results  if stream in r.keys() ]
 
-        # print (" {}".format(repr(keys)))
-        # print (" {}".format(repr(prt)))
+        if args.verbose == 3:
+            print ("## {}".format(repr(keys)),file=sys.stderr)
+            print ("## {}".format(repr(prt)),file=sys.stderr)
 
         for k in prt.keys():
             for ad in prt[k]:
                 for x in ad.keys():
                     y,m = ad[x]
                     print ("{}{} {} {}".format(k, m, x, y))
+        if args.run:
+            for i in range(len(runs)):
+                print (runs[i])
 if __name__ == '__main__':
     main()
