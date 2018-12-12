@@ -8,17 +8,17 @@ RM := rm -vf
 SRCS := $(wildcard *.cc *.h)
 
 #
-# 20 nodes, ramp with amount of nodes marking
+# 5 nodes, ramp with amount of nodes marking
 #
 run: clean-results $(SRCS) | $(OUTDIR)
-	./run-test.bash $(TOP) $(OUTDIR) 20
+	./run-test.bash $(TOP) $(OUTDIR) 10
 	rm -rf $(OUTDIR)
 
 #
-# ramp from 1 to 20 marking nodes
+# ramp BW with 10 nodes
 #
 ramp: clean-results $(SRCS) | $(OUTDIR)
-	./run-ramp-test.bash $(TOP) $(OUTDIR) 20
+	./run-ramp-test.bash $(TOP) $(OUTDIR) 10
 	rm -rf $(OUTDIR)
 
 check: clean-results $(SRCS) | $(OUTDIR)

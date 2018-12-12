@@ -28,6 +28,8 @@ function save_results() {
 
 function main() {
   local base_from=$1 base_to=$2
+  local tag
+  local cmd
 
   start=$(date "+%Y%m%d-%H%M")
   nodes=0
@@ -35,20 +37,34 @@ function main() {
 
   while [ ${nodes} -le ${maxnodes} ]
   do
-    for stag in "audio" "video"
+    for stag in "video" "Video"
     do
 	  RUN=$(date '+%s')
 	  RUN=$((RUN % 512))
-      local tag=`printf "llt-simple-marking-%s-%02d-%02d" ${stag} ${nodes} ${maxnodes}`
+	  [ "${stag}" == "uvideo" ] && tag="llt-simple-100-100-%02d-%02d" # 80kbps  = 10kBps;  small packets
+	  [ "${stag}" == "mvideo" ] && tag="llt-simple-100-200-%02d-%02d" # 160kbps = 20kBps;
+	  [ "${stag}" == "svideo" ] && tag="llt-simple-100-400-%02d-%02d" # 320kbps = 40kBps;
+	  [ "${stag}" == "video" ]  && tag="llt-simple-100-800-%02d-%02d" # 640kbps = 80kBps;
+
+	  [ "${stag}" == "Uvideo" ] && tag="llt-simple-50-200-%02d-%02d"  # 80kbps  = 10kBps;  medium packets
+	  [ "${stag}" == "Mvideo" ] && tag="llt-simple-50-400-%02d-%02d"  # 160kbps = 20kBps;
+	  [ "${stag}" == "Svideo" ] && tag="llt-simple-50-800-%02d-%02d"  # 320kbps = 40kBps;
+	  [ "${stag}" == "Video" ]  && tag="llt-simple-50-1600-%02d-%02d" # 640kbps = 80kBps;
+
+      tag=`printf ${tag} ${nodes} ${maxnodes}`
       echo ">> Running ${stag} trial with ${nodes} of ${maxnodes} marking"
+
 	  cmd="llt-simple --RngRun=${RUN} --ns3::PointToPointEpcHelper::S1uLinkDataRate=$S1_BW --pcaps=${pcaps} --markers=${nodes} --nodes=${maxnodes} --run=${tag} --stag=${stag}"
 
-	  [ "${stag}" == "uvideo" ] && cmd="${cmd} --pps=100 --bytes=100" # 80kbps = 10kBps;  small packets
-	  [ "${stag}" == "mvideo" ] && cmd="${cmd} --pps=100 --bytes=200" # 160kbps = 20kBps; medium packets
-	  [ "${stag}" == "svideo" ] && cmd="${cmd} --pps=100 --bytes=400" # 320kbps = 40kBps; big packets
-	  [ "${stag}" == "video" ] &&  cmd="${cmd} --pps=100 --bytes=800" # 640kbps = 80kBps; very big
-	  [ "${stag}" == "Uvideo" ] && cmd="${cmd} --pps=50 --bytes=200"  # 80kbps = 10kBps;  medium packets
-	  [ "${stag}" == "Mvideo" ] && cmd="${cmd} --pps=50 --bytes=400"  # 160kbps = 20kBps; big packets
+	  [ "${stag}" == "uvideo" ] && cmd="${cmd} --pps=100 --bytes=100" # 80kbps  = 10kBps;  small packets
+	  [ "${stag}" == "mvideo" ] && cmd="${cmd} --pps=100 --bytes=200" # 160kbps = 20kBps;
+	  [ "${stag}" == "svideo" ] && cmd="${cmd} --pps=100 --bytes=400" # 320kbps = 40kBps;
+	  [ "${stag}" == "video" ] &&  cmd="${cmd} --pps=100 --bytes=800" # 640kbps = 80kBps;
+
+	  [ "${stag}" == "Uvideo" ] && cmd="${cmd} --pps=50 --bytes=200"  # 80kbps  = 10kBps;  medium packets
+	  [ "${stag}" == "Mvideo" ] && cmd="${cmd} --pps=50 --bytes=400"  # 160kbps = 20kBps;
+	  [ "${stag}" == "Svideo" ] && cmd="${cmd} --pps=50 --bytes=800"  # 320kbps = 40kBps;
+	  [ "${stag}" == "Video" ] &&  cmd="${cmd} --pps=50 --bytes=1600" # 640kbps = 80kBps;
 
 	  echo ">>   ${cmd}"
 	  NS_LOG="LLTSimple" ../../waf --run "${cmd}"
@@ -58,13 +74,14 @@ function main() {
     nodes=$((nodes + 1))
   done
   zipname=`printf "%s-%s.zip" $(basename $(pwd)) ${start}`
+  echo zip -9rD ${zipname} $2
   zip -9rD ${zipname} $2
 
-  if [ "%{doPdf}" == "true" ]; then
-    pdfname=`printf "simple-%s.pdf" ${start}`
+  if [ "${doPdf}" == "true" ]; then
+    pdfname="mvideo-Mvideo.pdf"
+    echo ./doPlot ${zipname} ${pdfname}
     ./doPlot ${zipname} ${pdfname}
   fi
-  # ./plotCBR ${zipname}
 }
 
 main $*
